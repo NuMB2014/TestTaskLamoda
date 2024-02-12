@@ -12,7 +12,6 @@ type db interface {
 	ReleaseGoods()
 }
 
-// TODO сделать составной индекс из полей uniq_code и storage_id
 type Database struct {
 	db *sql.Conn
 }

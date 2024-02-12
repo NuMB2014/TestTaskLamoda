@@ -1,4 +1,4 @@
-package goods
+package storages
 
 import (
 	"github.com/gin-gonic/gin"
@@ -22,25 +22,19 @@ func Delete(c *gin.Context) {
 	})
 }
 
-func Release(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "pong",
-	})
-}
-
-func Reserve(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "pong",
-	})
-}
-
-func Remains(c *gin.Context) {
+func Available(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
 func All(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"message": "pong",
+	})
+}
+
+func ChangeAccess(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
