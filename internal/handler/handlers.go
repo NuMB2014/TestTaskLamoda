@@ -3,7 +3,11 @@ package handler
 import (
 	"LamodaTest/internal/handler/goods"
 	"LamodaTest/internal/handler/storages"
+	"LamodaTest/internal/registry"
+	"context"
+	"database/sql"
 	"github.com/gin-gonic/gin"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 	"net/http"
 )
@@ -30,6 +34,16 @@ func Router(log *logrus.Logger, debug bool) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.LoggerWithWriter(log.Writer()))
 
+	db, err := sql.Open("mysql", "root:1@/Lamoda")
+	if err != nil {
+		log.Fatalf("Can't connect to mysql: %v", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Can't ping mysql: %v", err)
+	}
+	tmp := registry.New(db)
+	tmp.AvailableGoods(context.TODO(), log)
 	router.NoRoute(notFound)
 	router.NoMethod(notAllowed)
 
