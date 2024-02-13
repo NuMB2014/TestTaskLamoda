@@ -4,26 +4,12 @@ import (
 	"LamodaTest/internal/handler/goods"
 	"LamodaTest/internal/handler/storages"
 	"LamodaTest/internal/registry"
+	"context"
 	"database/sql"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/sirupsen/logrus"
 	"net/http"
-)
-
-const (
-	goodsAddRoute     = "/goods/add"
-	goodsDeleteRoute  = "/goods/delete"
-	goodsReserveRoute = "/goods/reserve"
-	goodsReleaseRoute = "/goods/release"
-	goodsRemainsRoute = "/goods/remains"
-	goodsAllRoute     = "/goods/all"
-
-	storageAddRoute       = "/storages/add"
-	storageDeleteRoute    = "/storages/delete"
-	storageAvailableRoute = "/storages/available"
-	storageAllRoute       = "/storages/all"
-	storageAccessStatus   = "/storages/access"
 )
 
 func Router(log *logrus.Logger, debug bool) *gin.Engine {
@@ -47,22 +33,22 @@ func Router(log *logrus.Logger, debug bool) *gin.Engine {
 	reg := registry.New(db)
 	goodH := goods.NewHandler(reg, log)
 	storageH := storages.NewHandler(reg, log)
-	//err = reg.ReserveGoods(context.TODO(), 1, 20)
+	reg.ReleaseGood(context.TODO(), 1, 1)
 	router.NoRoute(notFound)
 	router.NoMethod(notAllowed)
 
-	router.GET(goodsAddRoute, goodH.Add)
-	router.DELETE(goodsDeleteRoute, goodH.Delete)
-	router.POST(goodsReserveRoute, goodH.Reserve)
-	router.POST(goodsReleaseRoute, goodH.Release)
-	router.GET(goodsRemainsRoute, goodH.Remains)
-	router.GET(goodsAllRoute, goodH.All)
+	router.GET(goods.AddRoute, goodH.Add)
+	router.DELETE(goods.DeleteRoute, goodH.Delete)
+	router.POST(goods.ReserveRoute, goodH.Reserve)
+	router.POST(goods.ReleaseRoute, goodH.Release)
+	router.GET(goods.RemainsRoute, goodH.Remains)
+	router.GET(goods.AllRoute, goodH.All)
 
-	router.GET(storageAddRoute, storageH.Add)
-	router.DELETE(storageDeleteRoute, storageH.Delete)
-	router.GET(storageAvailableRoute, storageH.Available)
-	router.GET(storageAllRoute, storageH.All)
-	router.POST(storageAccessStatus, storageH.ChangeAccess)
+	router.GET(storages.AddRoute, storageH.Add)
+	router.DELETE(storages.DeleteRoute, storageH.Delete)
+	router.GET(storages.AvailableRoute, storageH.Available)
+	router.GET(storages.AllRoute, storageH.All)
+	router.POST(storages.AccessStatus, storageH.ChangeAccess)
 
 	return router
 }

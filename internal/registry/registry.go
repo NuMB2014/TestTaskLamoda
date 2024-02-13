@@ -12,6 +12,7 @@ import (
 
 type Db interface {
 	Storages(ctx context.Context) ([]storages.Storage, error)
+	Goods(ctx context.Context) ([]goods.Good, error)
 	AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error)
 	ReserveGood(ctx context.Context, uniqId int, count int) (map[int]int, error)
 	ReleaseGood(ctx context.Context)
@@ -112,7 +113,13 @@ func (d *Database) ReserveGood(ctx context.Context, uniqId int, count int) (map[
 		return nil, err
 	}
 	reserved := map[int]int{}
-	rows, err := d.conn.QueryContext(ctx, "SELECT remains.id, remains.storage_id, remains.count - remains.reserved AS avail from remains where good_id = ?", id)
+	rows, err := d.conn.QueryContext(ctx, `SELECT 
+			remains.id, 
+			remains.storage_id, 
+			remains.count - remains.reserved AS avail 
+		from remains 
+		JOIN storages ON storages.id = remains.storage_id 
+		where good_id = ? AND storages.available = 1`, id)
 	for rows.Next() {
 		var tmp struct {
 			Id        int
@@ -153,6 +160,81 @@ func (d *Database) ReserveGood(ctx context.Context, uniqId int, count int) (map[
 	return reserved, nil
 }
 
-func (d *Database) ReleaseGood(ctx context.Context) {
+func (d *Database) ReleaseGood(ctx context.Context, uniqId int, count int) error {
+	tx, err := d.conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable}) //
+	if err != nil {
+		return fmt.Errorf("can't init transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var id int
+	if err = tx.QueryRowContext(ctx, "SELECT id from goods where uniq_code = ?",
+		uniqId).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("can't found good with uniq_code %d", uniqId)
+		}
+		return err
+	}
+	rows, err := d.conn.QueryContext(ctx, `SELECT 
+			remains.id, 
+			remains.storage_id, 
+			remains.reserved
+		from remains 
+		JOIN storages ON storages.id = remains.storage_id 
+		where good_id = ? AND storages.available = 1`, id)
+	for rows.Next() {
+		var tmp struct {
+			Id        int
+			storageId int
+			Reserved  int
+		}
+		err = rows.Scan(&tmp.Id, &tmp.storageId, &tmp.Reserved)
+		if err != nil {
+			return fmt.Errorf("can't get release good with id %d: %w", id, err)
+		}
+		if tmp.Reserved < count {
+			_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved - ? WHERE id = ?",
+				tmp.Reserved, tmp.Id)
+			if err != nil {
+				return fmt.Errorf("can't release good with id %d: %w", tmp.Id, err)
+			}
+			count = count - tmp.Reserved
+		} else {
+			_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved - ? WHERE id = ?",
+				count, tmp.Id)
+			if err != nil {
+				return fmt.Errorf("can't release good with id %d: %w", tmp.Id, err)
+			}
+			count = 0
+		}
+	}
+	defer rows.Close()
+	if count != 0 {
+		return fmt.Errorf("can't release good with id %d: not enough reserved goods on available storages", uniqId)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("can't commit release transaction: %w", err)
+	}
+	return nil
+}
 
+func (d *Database) Goods(ctx context.Context) ([]goods.Good, error) {
+	cmd, err := d.conn.Prepare("select * from goods;")
+	rows, err := cmd.QueryContext(ctx)
+	var result []goods.Good
+	defer rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("can't scan from goods list: %w", err)
+	}
+	for rows.Next() {
+		values := goods.Good{}
+		err = rows.Scan(&values.Id, &values.Name, &values.Size, &values.UniqCode)
+		if err != nil {
+			return nil, fmt.Errorf("can't scan from goods list: %w", err)
+		}
+		result = append(result, values)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error when try get all goods: %w", err)
+	}
+	return result, nil
 }

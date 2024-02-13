@@ -8,6 +8,14 @@ import (
 	"net/http"
 )
 
+const (
+	AddRoute       = "/storages/add"
+	DeleteRoute    = "/storages/delete"
+	AvailableRoute = "/storages/available"
+	AllRoute       = "/storages/all"
+	AccessStatus   = "/storages/access"
+)
+
 type Handler struct {
 	registry *registry.Database
 	log      logrus.FieldLogger
