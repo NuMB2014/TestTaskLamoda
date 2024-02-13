@@ -1,41 +1,55 @@
 package storages
 
 import (
+	"LamodaTest/internal/registry"
+	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"net/http"
 )
 
 type Handler struct {
-	//handler.Route
-	log logrus.FieldLogger
+	registry *registry.Database
+	log      logrus.FieldLogger
 }
 
-func Add(c *gin.Context) {
+func NewHandler(registry *registry.Database, log logrus.FieldLogger) *Handler {
+	return &Handler{registry: registry, log: log}
+}
+
+func (h *Handler) Add(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
-func Delete(c *gin.Context) {
+func (h *Handler) Delete(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
-func Available(c *gin.Context) {
+func (h *Handler) Available(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",
 	})
 }
 
-func All(c *gin.Context) {
+func (h *Handler) All(c *gin.Context) {
+	storages, err := h.registry.Storages(context.Background())
+	if err != nil {
+		h.log.Errorf("can't get all storages: %s", err.Error())
+		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
+	}
 	c.JSON(200, gin.H{
-		"message": "pong",
+		"code": http.StatusOK,
+		"data": storages,
 	})
 }
 
-func ChangeAccess(c *gin.Context) {
+func (h *Handler) ChangeAccess(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"message": "pong",
+		"code": http.StatusOK,
+		"data": "storages",
 	})
 }

@@ -1,19 +1,19 @@
 package registry
 
 import (
+	"LamodaTest/internal/entity/goods"
 	"LamodaTest/internal/entity/storages"
 	"context"
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/sirupsen/logrus"
 )
 
 type Db interface {
 	Storages(ctx context.Context) ([]storages.Storage, error)
-	AvailableGoods(ctx context.Context, log logrus.FieldLogger)
-	ReserveGoods(ctx context.Context, log logrus.FieldLogger)
-	ReleaseGoods(ctx context.Context, log logrus.FieldLogger)
+	AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error)
+	ReserveGoods(ctx context.Context)
+	ReleaseGoods(ctx context.Context)
 }
 
 type Database struct {
@@ -28,7 +28,6 @@ func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
 	cmd, err := d.db.Prepare("select * from storages;")
 	rows, err := cmd.QueryContext(ctx)
 	var result []storages.Storage
-	ctx.Done()
 	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("can't scan from storage list: %s", err.Error())
@@ -47,13 +46,23 @@ func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
 	return result, nil
 }
 
-func (d *Database) AvailableGoods(ctx context.Context, log logrus.FieldLogger) (map[int]interface{}, error) {
-	cmd, err := d.db.Prepare("select goods.name, goods.size, goods.uniq_code, storages.id AS storage_id, remains.count - remains.reserved AS avail FROM goods JOIN remains ON goods.id = remains.good_id JOIN storages ON remains.storage_id = storages.id WHERE remains.count > reserved AND available = 1")
+func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error) {
+	cmd, err := d.db.Prepare(`select 
+			goods.name, 
+			goods.size, 
+			goods.uniq_code, 
+			storages.id AS storage_id, 
+			remains.count - remains.reserved AS avail 
+		FROM 
+		    goods 
+		JOIN remains ON goods.id = remains.good_id 
+		JOIN storages ON remains.storage_id = storages.id 
+		WHERE remains.count > reserved AND available = 1`)
 	rows, err := cmd.QueryContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("can't query avail goods: %s", err.Error())
 	}
-	result := map[int]interface{}{}
+	result := map[int]goods.RemainsDTO{}
 	ctx.Done()
 	defer rows.Close()
 	for rows.Next() {
@@ -69,17 +78,16 @@ func (d *Database) AvailableGoods(ctx context.Context, log logrus.FieldLogger) (
 			return nil, fmt.Errorf("can't scan from rows: %s", err.Error())
 		}
 
-		if data, ok := result[tmp.UniqId]; !ok {
-			result[tmp.UniqId] = map[string]interface{}{
-				"name": tmp.Name,
-				"size": tmp.Size,
-				"storage_available": map[int]interface{}{
+		if note, ok := result[tmp.UniqId]; !ok {
+			result[tmp.UniqId] = goods.RemainsDTO{
+				Name: tmp.Name,
+				Size: tmp.Size,
+				StorageAvailable: map[int]int{
 					tmp.Storage: tmp.Avail,
 				},
 			}
 		} else {
-			note := data.(map[string]interface{})
-			note["storage_available"].(map[int]interface{})[tmp.Storage] = tmp.Avail
+			note.StorageAvailable[tmp.Storage] = tmp.Avail
 		}
 	}
 	if err = rows.Err(); err != nil {
@@ -88,10 +96,10 @@ func (d *Database) AvailableGoods(ctx context.Context, log logrus.FieldLogger) (
 	return result, nil
 }
 
-func (d *Database) ReserveGoods(ctx context.Context, log logrus.FieldLogger) {
+func (d *Database) ReserveGoods(ctx context.Context) {
 
 }
 
-func (d *Database) ReleaseGoods(ctx context.Context, log logrus.FieldLogger) {
+func (d *Database) ReleaseGoods(ctx context.Context) {
 
 }

@@ -1,4 +1,7 @@
 package goods
 
-type Good struct {
+type RemainsDTO struct {
+	Name             string      `json:"name"`
+	Size             string      `json:"size"`
+	StorageAvailable map[int]int `json:"storage_available"`
 }
