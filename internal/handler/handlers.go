@@ -41,9 +41,13 @@ func Router(log *logrus.Logger, debug bool) *gin.Engine {
 	if err != nil {
 		log.Fatalf("Can't ping mysql: %v", err)
 	}
+	db.SetConnMaxLifetime(0)
+	db.SetMaxIdleConns(50)
+	db.SetMaxOpenConns(50)
 	reg := registry.New(db)
 	goodH := goods.NewHandler(reg, log)
 	storageH := storages.NewHandler(reg, log)
+	//err = reg.ReserveGoods(context.TODO(), 1, 20)
 	router.NoRoute(notFound)
 	router.NoMethod(notAllowed)
 

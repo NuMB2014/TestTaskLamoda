@@ -5,6 +5,7 @@ import (
 	"LamodaTest/internal/entity/storages"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -12,20 +13,20 @@ import (
 type Db interface {
 	Storages(ctx context.Context) ([]storages.Storage, error)
 	AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error)
-	ReserveGoods(ctx context.Context)
-	ReleaseGoods(ctx context.Context)
+	ReserveGood(ctx context.Context, uniqId int, count int) (map[int]int, error)
+	ReleaseGood(ctx context.Context)
 }
 
 type Database struct {
-	db *sql.DB
+	conn *sql.DB
 }
 
 func New(connect *sql.DB) *Database {
-	return &Database{db: connect}
+	return &Database{conn: connect}
 }
 
 func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
-	cmd, err := d.db.Prepare("select * from storages;")
+	cmd, err := d.conn.Prepare("select * from storages;")
 	rows, err := cmd.QueryContext(ctx)
 	var result []storages.Storage
 	defer rows.Close()
@@ -47,7 +48,7 @@ func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
 }
 
 func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error) {
-	cmd, err := d.db.Prepare(`select 
+	cmd, err := d.conn.Prepare(`select 
 			goods.name, 
 			goods.size, 
 			goods.uniq_code, 
@@ -96,10 +97,62 @@ func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO
 	return result, nil
 }
 
-func (d *Database) ReserveGoods(ctx context.Context) {
-
+func (d *Database) ReserveGood(ctx context.Context, uniqId int, count int) (map[int]int, error) {
+	tx, err := d.conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable}) //
+	if err != nil {
+		return nil, fmt.Errorf("can't init transaction: %w", err)
+	}
+	defer tx.Rollback()
+	var id int
+	if err = tx.QueryRowContext(ctx, "SELECT id from goods where uniq_code = ?",
+		uniqId).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("not found goods")
+		}
+		return nil, err
+	}
+	reserved := map[int]int{}
+	rows, err := d.conn.QueryContext(ctx, "SELECT remains.id, remains.storage_id, remains.count - remains.reserved AS avail from remains where good_id = ?", id)
+	for rows.Next() {
+		var tmp struct {
+			Id        int
+			storageId int
+			Avail     int
+		}
+		err = rows.Scan(&tmp.Id, &tmp.storageId, &tmp.Avail)
+		if err != nil {
+			return nil, fmt.Errorf("can't get remains by %d good: %w", id, err)
+		}
+		if tmp.Avail > 0 {
+			if tmp.Avail < count {
+				_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved + ? WHERE id = ?",
+					tmp.Avail, tmp.Id)
+				if err != nil {
+					return nil, fmt.Errorf("can't reserve good by %d id: %w", tmp.Id, err)
+				}
+				count = count - tmp.Avail
+				reserved[tmp.storageId] = tmp.Avail
+			} else {
+				_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved + ? WHERE id = ?",
+					count, tmp.Id)
+				if err != nil {
+					return nil, fmt.Errorf("can't reserve good by %d id: %w", tmp.Id, err)
+				}
+				reserved[tmp.storageId] = count
+				count = 0
+			}
+		}
+	}
+	defer rows.Close()
+	if len(reserved) == 0 || count != 0 {
+		return nil, fmt.Errorf("can't reserve %d good: not enough goods on available storages", uniqId)
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("can't commit reserve transaction: %w", err)
+	}
+	return reserved, nil
 }
 
-func (d *Database) ReleaseGoods(ctx context.Context) {
+func (d *Database) ReleaseGood(ctx context.Context) {
 
 }
