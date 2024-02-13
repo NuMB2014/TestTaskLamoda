@@ -15,7 +15,7 @@ type Db interface {
 	Goods(ctx context.Context) ([]goods.Good, error)
 	AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error)
 	ReserveGood(ctx context.Context, uniqId int, count int) (map[int]int, error)
-	ReleaseGood(ctx context.Context)
+	ReleaseGood(ctx context.Context, uniqId int, count int) error
 }
 
 type Database struct {
