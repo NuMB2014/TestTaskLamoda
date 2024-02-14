@@ -14,12 +14,12 @@ type RemainsDTO struct {
 }
 
 type ReservedDTO struct {
-	UniqId         int              `json:"uniq_id"`
+	UniqCode       int              `json:"uniq_code"`
 	Storages       []map[string]int `json:"storages"`
 	AdditionalInfo string           `json:"additional_info,omitempty"`
 }
 
 type ReleasedDTO struct {
-	UniqId         int    `json:"uniq_id"`
+	UniqCode       int    `json:"uniq_code"`
 	AdditionalInfo string `json:"additional_info,omitempty"`
 }

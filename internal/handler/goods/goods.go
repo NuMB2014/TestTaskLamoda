@@ -18,9 +18,15 @@ const (
 	AllRoute     = "/goods/all"
 )
 
-type GoodWithCount struct {
-	UniqId int `json:"uniq_id" binding:"required"`
-	Count  int `json:"count" binding:"required"`
+type goodWithCount struct {
+	UniqCode int `json:"uniq_code" binding:"required"`
+	Count    int `json:"count" binding:"required"`
+}
+
+type Add struct {
+	Name     string `json:"name" binding:"required"`
+	Size     string `json:"size" binding:"required"`
+	UniqCode int    `json:"uniq_code" binding:"required"`
 }
 
 type Handler struct {
@@ -33,19 +39,54 @@ func NewHandler(registry *registry.Database, log logrus.FieldLogger) *Handler {
 }
 
 func (h *Handler) Add(c *gin.Context) {
+	var input Add
+	if err := c.ShouldBindJSON(&input); err != nil {
+		h.log.Errorf("can't parse body from `/good/add` request: %s", err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "message": "Invalid JSON"})
+		return
+	}
+	goodId, err := h.registry.GoodAdd(context.Background(), input.Name, input.Size, input.UniqCode)
+	if err != nil {
+		h.log.Errorf("can't add good: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "Not added"})
+		return
+	}
 	c.JSON(200, gin.H{
-		"message": "pong",
+		"code": http.StatusOK,
+		"data": goodId,
 	})
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	var input struct {
+		UniqCode int `json:"uniq_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		h.log.Errorf("can't parse body from `/good/delete` request: %s", err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "message": "Invalid JSON"})
+		return
+	}
+	deleted, err := h.registry.GoodDelete(context.Background(), input.UniqCode)
+	if err != nil {
+		h.log.Errorf("can't delete good: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"code": http.StatusInternalServerError, "message": "Can't delete this good"})
+		return
+	}
+	if deleted == 0 {
+		c.JSON(200, gin.H{
+			"code":    http.StatusOK,
+			"message": "no records are affected",
+		})
+		return
+	}
 	c.JSON(200, gin.H{
-		"message": "pong",
+		"code":    http.StatusOK,
+		"message": "OK",
 	})
 }
 
 func (h *Handler) Release(c *gin.Context) {
-	var inputArr []GoodWithCount
+	var inputArr []goodWithCount
 	if err := c.ShouldBindJSON(&inputArr); err != nil {
 		h.log.Errorf("can't parse body from `/good/release` request: %s", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "message": "Invalid JSON"})
@@ -53,9 +94,9 @@ func (h *Handler) Release(c *gin.Context) {
 	}
 	var result []goods.ReleasedDTO
 	for _, obj := range inputArr {
-		err := h.registry.ReleaseGood(context.Background(), obj.UniqId, obj.Count)
+		err := h.registry.ReleaseGood(context.Background(), obj.UniqCode, obj.Count)
 		tmp := goods.ReleasedDTO{}
-		tmp.UniqId = obj.UniqId
+		tmp.UniqCode = obj.UniqCode
 		if err != nil {
 			h.log.Warn(err)
 			tmp.AdditionalInfo = "can't release this good"
@@ -71,7 +112,7 @@ func (h *Handler) Release(c *gin.Context) {
 }
 
 func (h *Handler) Reserve(c *gin.Context) {
-	var inputArr []GoodWithCount
+	var inputArr []goodWithCount
 	if err := c.ShouldBindJSON(&inputArr); err != nil {
 		h.log.Errorf("can't parse body from `/good/reserve` request: %s", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "message": "Invalid JSON"})
@@ -79,12 +120,12 @@ func (h *Handler) Reserve(c *gin.Context) {
 	}
 	var result []goods.ReservedDTO
 	for _, obj := range inputArr {
-		reserved, err := h.registry.ReserveGood(context.Background(), obj.UniqId, obj.Count)
+		reserved, err := h.registry.ReserveGood(context.Background(), obj.UniqCode, obj.Count)
 		if err != nil {
 			h.log.Warn(err)
 		}
 		tmp := goods.ReservedDTO{
-			UniqId:         obj.UniqId,
+			UniqCode:       obj.UniqCode,
 			Storages:       []map[string]int{},
 			AdditionalInfo: "",
 		}
@@ -108,25 +149,25 @@ func (h *Handler) Reserve(c *gin.Context) {
 }
 
 func (h *Handler) Remains(c *gin.Context) {
-	goods, err := h.registry.AvailableGoods(context.Background())
+	list, err := h.registry.AvailableGoods(context.Background())
 	if err != nil {
 		h.log.Errorf("can't get available goods: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,
-		"data": goods,
+		"data": list,
 	})
 }
 
 func (h *Handler) All(c *gin.Context) {
-	storages, err := h.registry.Goods(context.Background())
+	list, err := h.registry.Goods(context.Background())
 	if err != nil {
 		h.log.Errorf("can't get all goods: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,
-		"data": storages,
+		"data": list,
 	})
 }

@@ -37,14 +37,14 @@ func Router(log *logrus.Logger, debug bool) *gin.Engine {
 	router.NoRoute(notFound)
 	router.NoMethod(notAllowed)
 
-	router.GET(goods.AddRoute, goodH.Add)
+	router.PUT(goods.AddRoute, goodH.Add)
 	router.DELETE(goods.DeleteRoute, goodH.Delete)
 	router.POST(goods.ReserveRoute, goodH.Reserve)
 	router.POST(goods.ReleaseRoute, goodH.Release)
 	router.GET(goods.RemainsRoute, goodH.Remains)
 	router.GET(goods.AllRoute, goodH.All)
 
-	router.GET(storages.AddRoute, storageH.Add)
+	router.PUT(storages.AddRoute, storageH.Add)
 	router.DELETE(storages.DeleteRoute, storageH.Delete)
 	router.GET(storages.AvailableRoute, storageH.Available)
 	router.GET(storages.AllRoute, storageH.All)

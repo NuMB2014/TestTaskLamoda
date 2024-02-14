@@ -195,14 +195,14 @@ func (d *Database) ReleaseGood(ctx context.Context, uniqId int, count int) error
 			_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved - ? WHERE id = ?",
 				tmp.Reserved, tmp.Id)
 			if err != nil {
-				return fmt.Errorf("can't release good with id %d: %w", tmp.Id, err)
+				return fmt.Errorf("can't update remains note with id %d: %w", tmp.Id, err)
 			}
 			count = count - tmp.Reserved
 		} else {
 			_, err = tx.ExecContext(ctx, "UPDATE remains SET reserved = reserved - ? WHERE id = ?",
 				count, tmp.Id)
 			if err != nil {
-				return fmt.Errorf("can't release good with id %d: %w", tmp.Id, err)
+				return fmt.Errorf("can't update remains note with id %d: %w", tmp.Id, err)
 			}
 			count = 0
 		}
@@ -237,4 +237,29 @@ func (d *Database) Goods(ctx context.Context) ([]goods.Good, error) {
 		return nil, fmt.Errorf("error when try get all goods: %w", err)
 	}
 	return result, nil
+}
+
+func (d *Database) GoodAdd(ctx context.Context, name string, size string, uniqCode int) (int64, error) {
+	result, err := d.conn.ExecContext(ctx, "insert into goods (name, size, uniq_code) values (?, ?, ?)",
+		name, size, uniqCode)
+	if err != nil {
+		return -1, fmt.Errorf("can't add good [%s, %s, %d]: %w", name, size, uniqCode, err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return -1, fmt.Errorf("can't get last added good id from database: %w", err)
+	}
+	return id, nil
+}
+
+func (d *Database) GoodDelete(ctx context.Context, uniqCode int) (int64, error) {
+	result, err := d.conn.ExecContext(ctx, "delete from goods where uniq_code = ?", uniqCode)
+	if err != nil {
+		return -1, fmt.Errorf("can't delete good with uniq_code %d: %w", uniqCode, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return -1, fmt.Errorf("can't get row affected after delete good: %w", err)
+	}
+	return affected, nil
 }
