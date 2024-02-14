@@ -23,12 +23,6 @@ type goodWithCount struct {
 	Count    int `json:"count" binding:"required"`
 }
 
-type Add struct {
-	Name     string `json:"name" binding:"required"`
-	Size     string `json:"size" binding:"required"`
-	UniqCode int    `json:"uniq_code" binding:"required"`
-}
-
 type Handler struct {
 	registry *registry.Database
 	log      logrus.FieldLogger
@@ -39,7 +33,11 @@ func NewHandler(registry *registry.Database, log logrus.FieldLogger) *Handler {
 }
 
 func (h *Handler) Add(c *gin.Context) {
-	var input Add
+	var input struct {
+		Name     string `json:"name" binding:"required"`
+		Size     string `json:"size" binding:"required"`
+		UniqCode int    `json:"uniq_code" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		h.log.Errorf("can't parse body from `/good/add` request: %s", err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{"code": http.StatusBadRequest, "message": "Invalid JSON"})
@@ -75,7 +73,7 @@ func (h *Handler) Delete(c *gin.Context) {
 	if deleted == 0 {
 		c.JSON(200, gin.H{
 			"code":    http.StatusOK,
-			"message": "no records are affected",
+			"message": "no records are deleted",
 		})
 		return
 	}

@@ -11,11 +11,16 @@ import (
 )
 
 type Db interface {
-	Storages(ctx context.Context) ([]storages.Storage, error)
+	Storages(ctx context.Context, all bool) ([]storages.Storage, error)
+	StoragesAdd(ctx context.Context, name string, available bool) (int64, error)
+	StoragesDelete(ctx context.Context, id int) (int64, error)
+	StoragesChangeAccess(ctx context.Context, id int, available bool) (int64, error)
 	Goods(ctx context.Context) ([]goods.Good, error)
 	AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error)
 	ReserveGood(ctx context.Context, uniqId int, count int) (map[int]int, error)
 	ReleaseGood(ctx context.Context, uniqId int, count int) error
+	GoodAdd(ctx context.Context, name string, size string, uniqCode int) (int64, error)
+	GoodDelete(ctx context.Context, uniqCode int) (int64, error)
 }
 
 type Database struct {
@@ -26,8 +31,12 @@ func New(connect *sql.DB) *Database {
 	return &Database{conn: connect}
 }
 
-func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
-	cmd, err := d.conn.Prepare("select * from storages;")
+func (d *Database) Storages(ctx context.Context, all bool) ([]storages.Storage, error) {
+	query := "select * from storages"
+	if !all {
+		query = fmt.Sprintf("%s where available = 1", query)
+	}
+	cmd, err := d.conn.Prepare(query)
 	rows, err := cmd.QueryContext(ctx)
 	var result []storages.Storage
 	defer rows.Close()
@@ -46,6 +55,43 @@ func (d *Database) Storages(ctx context.Context) ([]storages.Storage, error) {
 		return nil, fmt.Errorf("error when try get all storages: %v", err)
 	}
 	return result, nil
+}
+
+func (d *Database) StoragesAdd(ctx context.Context, name string, available bool) (int64, error) {
+	result, err := d.conn.ExecContext(ctx, "insert into storages (name, available) values (?, ?)",
+		name, available)
+	if err != nil {
+		return -1, fmt.Errorf("can't add storage [%s, %t]: %w", name, available, err)
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return -1, fmt.Errorf("can't get last added storage id from database: %w", err)
+	}
+	return id, nil
+}
+
+func (d *Database) StoragesDelete(ctx context.Context, id int) (int64, error) {
+	result, err := d.conn.ExecContext(ctx, "delete from storages where id = ?", id)
+	if err != nil {
+		return -1, fmt.Errorf("can't delete storage with id %d: %w", id, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return -1, fmt.Errorf("can't get row affected after delete storage: %w", err)
+	}
+	return affected, nil
+}
+
+func (d *Database) StoragesChangeAccess(ctx context.Context, id int, available bool) (int64, error) {
+	result, err := d.conn.ExecContext(ctx, "update storages set available = ? where id = ?", available, id)
+	if err != nil {
+		return -1, fmt.Errorf("can't change storage with id %d: %w", id, err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return -1, fmt.Errorf("can't get row affected after change storage: %w", err)
+	}
+	return affected, nil
 }
 
 func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO, error) {
