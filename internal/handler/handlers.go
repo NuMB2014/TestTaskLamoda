@@ -4,7 +4,6 @@ import (
 	"LamodaTest/internal/handler/goods"
 	"LamodaTest/internal/handler/storages"
 	"LamodaTest/internal/registry"
-	"context"
 	"database/sql"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -12,28 +11,16 @@ import (
 	"net/http"
 )
 
-func Router(log *logrus.Logger, debug bool) *gin.Engine {
+func Router(log *logrus.Logger, debug bool, db *sql.DB) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
 	router.Use(gin.LoggerWithWriter(log.Writer()))
 
-	db, err := sql.Open("mysql", "root:1@/Lamoda")
-	if err != nil {
-		log.Fatalf("Can't connect to mysql: %v", err)
-	}
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("Can't ping mysql: %v", err)
-	}
-	db.SetConnMaxLifetime(0)
-	db.SetMaxIdleConns(50)
-	db.SetMaxOpenConns(50)
 	reg := registry.New(db)
 	goodH := goods.NewHandler(reg, log)
 	storageH := storages.NewHandler(reg, log)
-	reg.ReleaseGood(context.TODO(), 1, 1)
 	router.NoRoute(notFound)
 	router.NoMethod(notAllowed)
 

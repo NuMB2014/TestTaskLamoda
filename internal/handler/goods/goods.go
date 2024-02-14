@@ -24,11 +24,11 @@ type goodWithCount struct {
 }
 
 type Handler struct {
-	registry *registry.Database
+	registry registry.Db
 	log      logrus.FieldLogger
 }
 
-func NewHandler(registry *registry.Database, log logrus.FieldLogger) *Handler {
+func NewHandler(registry registry.Db, log logrus.FieldLogger) *Handler {
 	return &Handler{registry: registry, log: log}
 }
 
@@ -151,6 +151,7 @@ func (h *Handler) Remains(c *gin.Context) {
 	if err != nil {
 		h.log.Errorf("can't get available goods: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
+		return
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,
@@ -163,6 +164,7 @@ func (h *Handler) All(c *gin.Context) {
 	if err != nil {
 		h.log.Errorf("can't get all goods: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
+		return
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,

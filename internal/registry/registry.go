@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"strconv"
 )
 
 type Db interface {
@@ -37,17 +38,24 @@ func (d *Database) Storages(ctx context.Context, all bool) ([]storages.Storage, 
 		query = fmt.Sprintf("%s where available = 1", query)
 	}
 	cmd, err := d.conn.Prepare(query)
-	rows, err := cmd.QueryContext(ctx)
-	var result []storages.Storage
-	defer rows.Close()
 	if err != nil {
-		return nil, fmt.Errorf("can't scan from storage list: %s", err.Error())
+		return nil, fmt.Errorf("can't prepare sql: %w", err)
 	}
+	rows, err := cmd.QueryContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("can't scan from storage list: %w", err)
+	}
+	defer rows.Close()
+	var result []storages.Storage
 	for rows.Next() {
 		values := storages.Storage{}
-		err = rows.Scan(&values.ID, &values.Name, &values.Available)
+		err = rows.Scan(&values.ID, &values.Name, &values.RawAvailable)
 		if err != nil {
 			return nil, fmt.Errorf("can't scan from storage list: %s", err.Error())
+		}
+		values.Available, err = strconv.ParseBool(values.RawAvailable)
+		if err != nil {
+			return nil, fmt.Errorf("can't parse bool from %s str: %w", values.RawAvailable, err)
 		}
 		result = append(result, values)
 	}
@@ -106,6 +114,9 @@ func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO
 		JOIN remains ON goods.id = remains.good_id 
 		JOIN storages ON remains.storage_id = storages.id 
 		WHERE remains.count > reserved AND available = 1`)
+	if err != nil {
+		return nil, fmt.Errorf("can't prepare sql: %w", err)
+	}
 	rows, err := cmd.QueryContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("can't query avail goods: %s", err.Error())
@@ -139,7 +150,7 @@ func (d *Database) AvailableGoods(ctx context.Context) (map[int]goods.RemainsDTO
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error when try get all storages: %v", err)
+		return nil, fmt.Errorf("error when try get available goods: %v", err)
 	}
 	return result, nil
 }
@@ -166,6 +177,9 @@ func (d *Database) ReserveGood(ctx context.Context, uniqId int, count int) (map[
 		from remains 
 		JOIN storages ON storages.id = remains.storage_id 
 		where good_id = ? AND storages.available = 1`, id)
+	if err != nil {
+		return nil, fmt.Errorf("can't request avail goods for release: %w", err)
+	}
 	for rows.Next() {
 		var tmp struct {
 			Id        int
@@ -227,6 +241,9 @@ func (d *Database) ReleaseGood(ctx context.Context, uniqId int, count int) error
 		from remains 
 		JOIN storages ON storages.id = remains.storage_id 
 		where good_id = ? AND storages.available = 1`, id)
+	if err != nil {
+		return fmt.Errorf("can't request avail goods for release: %w", err)
+	}
 	for rows.Next() {
 		var tmp struct {
 			Id        int
@@ -265,12 +282,15 @@ func (d *Database) ReleaseGood(ctx context.Context, uniqId int, count int) error
 
 func (d *Database) Goods(ctx context.Context) ([]goods.Good, error) {
 	cmd, err := d.conn.Prepare("select * from goods;")
+	if err != nil {
+		return nil, fmt.Errorf("can't prepare sql: %w", err)
+	}
 	rows, err := cmd.QueryContext(ctx)
-	var result []goods.Good
-	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("can't scan from goods list: %w", err)
 	}
+	result := []goods.Good{}
+	defer rows.Close()
 	for rows.Next() {
 		values := goods.Good{}
 		err = rows.Scan(&values.Id, &values.Name, &values.Size, &values.UniqCode)

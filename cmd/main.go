@@ -3,6 +3,7 @@ package main
 import (
 	"LamodaTest/internal/handler"
 	"LamodaTest/internal/logger"
+	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -17,8 +18,20 @@ func main() {
 	port := flag.String("port", "8080", "port for web server")
 	flag.Parse()
 
-	router := handler.Router(log, debug)
-	err := router.Run(fmt.Sprintf("%s:%s", *ip, *port))
+	db, err := sql.Open("mysql", "root:1@/Lamoda")
+	if err != nil {
+		log.Fatalf("Can't connect to mysql: %v", err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("Can't ping mysql: %v", err)
+	}
+	db.SetConnMaxLifetime(0)
+	db.SetMaxIdleConns(50)
+	db.SetMaxOpenConns(50)
+
+	router := handler.Router(log, debug, db)
+	err = router.Run(fmt.Sprintf("%s:%s", *ip, *port))
 	if err != nil {
 		log.Fatal(err)
 	}

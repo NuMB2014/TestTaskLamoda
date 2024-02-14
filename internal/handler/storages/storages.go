@@ -17,14 +17,14 @@ const (
 )
 
 type Handler struct {
-	registry *registry.Database
+	registry registry.Db
 	log      logrus.FieldLogger
 }
 
 type Add struct {
 }
 
-func NewHandler(registry *registry.Database, log logrus.FieldLogger) *Handler {
+func NewHandler(registry registry.Db, log logrus.FieldLogger) *Handler {
 	return &Handler{registry: registry, log: log}
 }
 
@@ -83,6 +83,7 @@ func (h *Handler) Available(c *gin.Context) {
 	if err != nil {
 		h.log.Errorf("can't get available storages: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
+		return
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,
@@ -95,6 +96,7 @@ func (h *Handler) All(c *gin.Context) {
 	if err != nil {
 		h.log.Errorf("can't get all storages: %s", err.Error())
 		c.JSON(500, gin.H{"code": http.StatusInternalServerError, "message": "Internal server error"})
+		return
 	}
 	c.JSON(200, gin.H{
 		"code": http.StatusOK,
