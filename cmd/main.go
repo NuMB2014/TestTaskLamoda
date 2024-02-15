@@ -18,7 +18,7 @@ func main() {
 	port := flag.String("port", "8080", "port for web server")
 	flag.Parse()
 
-	db, err := sql.Open("mysql", "root:1@/Lamoda")
+	db, err := sql.Open("mysql", getMysqlDSN())
 	if err != nil {
 		log.Fatalf("Can't connect to mysql: %v", err)
 	}
@@ -44,4 +44,17 @@ func isDebug() bool {
 		return false
 	}
 	return true
+}
+
+func getMysqlDSN() string { //"username[:password]@][protocol[(address)]]/dbname" root:1@lamoda_mysql/Lamoda
+	database := os.Getenv("MYSQL_DATABASE")
+	user := os.Getenv("MYSQL_USER")
+	pass := os.Getenv("MYSQL_PASSWORD")
+	host := os.Getenv("MYSQL_HOST")
+	port := os.Getenv("MYSQL_PORT")
+	str := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", user, pass, host, port, database)
+	if len(str) <= 9 {
+		return ""
+	}
+	return str
 }

@@ -1,0 +1,29 @@
+services:
+  server:
+    container_name: lamoda_server
+    build:
+      dockerfile: Dockerfile
+    environment:
+      - DEBUG=false
+    env_file:
+      - .env
+    ports:
+      - '8080:8080'
+    networks:
+      - webnet
+    depends_on:
+      - mysql
+    restart: unless-stopped
+  mysql:
+    container_name: lamoda_mysql
+    image: 'mysql:latest'
+    env_file:
+      - .env
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./migration/db.sql:/docker-entrypoint-initdb.d/db.sql
+    networks:
+      - webnet
+networks:
+  webnet:
