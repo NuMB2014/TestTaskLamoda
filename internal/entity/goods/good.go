@@ -1,10 +1,10 @@
 package goods
 
 type Good struct {
-	Id       int
-	Name     string
-	Size     string
-	UniqCode int
+	Id       int    `json:"id"`
+	Name     string `json:"name"`
+	Size     string `json:"size"`
+	UniqCode int    `json:"uniq_code"`
 }
 
 type RemainsDTO struct {

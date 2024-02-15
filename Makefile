@@ -15,11 +15,11 @@ coverage:
 	go tool cover -html=coverage.out -o coverage.html
 	rm coverage.out
 
-docker-up:
+up:
 	docker compose up -d
-docker-down:
+down:
 	docker compose down
-docker-destroy:
+destroy:
 	docker compose down -v
-docker-restart:
+restart:
 	docker compose restart
